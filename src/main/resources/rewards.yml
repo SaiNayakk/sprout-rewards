@@ -1,0 +1,74 @@
+# Configuration for the rewards service. Named rewards.yml (not application.yml) so several services can
+# share one JVM host without their settings colliding.
+spring:
+  application:
+    name: sprout-rewards
+  datasource:
+    url: ${REWARDS_DB_URL:jdbc:postgresql://localhost:5432/sprout?currentSchema=rewards}
+    username: ${REWARDS_DB_USER:sprout}
+    password: ${REWARDS_DB_PASSWORD:sprout}
+    hikari:
+      maximum-pool-size: 5
+      pool-name: rewards
+      connection-timeout: 2000   # fail fast when the database is gone (CHAOS-01's lesson)
+      validation-timeout: 1000
+  flyway:
+    locations: classpath:db/rewards
+    schemas: rewards
+    default-schema: rewards
+  jackson:
+    default-property-inclusion: non_null   # absent, never null: the contracts say so
+    deserialization:
+      fail-on-unknown-properties: true
+  jmx:
+    enabled: false
+
+server:
+  port: ${REWARDS_PORT:8118}
+  address: ${REWARDS_BIND:127.0.0.1}
+  tomcat:
+    threads:
+      max: 16
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTEL_ENABLED:false}
+        url: ${OTEL_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: 15s
+    tracing:
+      endpoint: ${OTEL_TRACES_URL:http://localhost:4318/v1/traces}
+      export:
+        enabled: ${OTEL_ENABLED:false}   # send traces to a collector only when one runs
+  tracing:
+    enabled: true   # always carry the trace onward (W3C traceparent), even when nothing collects it
+    sampling:
+      probability: 1.0
+  metrics:
+    tags:
+      service: sprout-rewards
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:}
+  pattern:
+    correlation: "[%X{requestId:-}] "
+
+sprout:
+  rewards:
+    service-key: ${SPROUT_SERVICE_KEY:dev-only-service-key}
+    referral-points: 500              # to each of the two, once the new customer has invested in 3 different months
+    referral-months: 3
+    referral-window: 30d              # a friend's code can be entered this long after opening an account
+    accounts-url: ${REWARDS_ACCOUNTS_URL:http://127.0.0.1:8104}
+    habits-url: ${REWARDS_HABITS_URL:http://127.0.0.1:8116}
